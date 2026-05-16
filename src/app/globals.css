@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  --ws-cream: #FBF5EC;
+  --ws-paper: #FFFBF3;
+  --ws-ink: #2A1F1B;
+  --ws-terra: #D86B43;
+  --ws-sage: #5C8A60;
+  --ws-butter: #F4D58A;
+  --ws-line: #E8DFCF;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--ws-cream);
+  color: var(--ws-ink);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Mobile-first scroll lock for full-height screens */
+.mobile-screen {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ws-line);
+  border-radius: 99px;
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--ws-terra);
+  outline-offset: 2px;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
