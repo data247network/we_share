@@ -1,0 +1,26 @@
+export const WS = {
+  cream: "#FBF5EC",
+  paper: "#FFFBF3",
+  card: "#FFFFFF",
+  ink: "#2A1F1B",
+  ink2: "#5A4A40",
+  mute: "#8C7E73",
+  line: "#E8DFCF",
+  line2: "#F1E9D9",
+  terra: "#D86B43",
+  terraDk: "#B2532F",
+  terraLt: "#F6D9C8",
+  sage: "#5C8A60",
+  sageLt: "#D4E2D2",
+  butter: "#F4D58A",
+  butterLt: "#FBEEC6",
+  plum: "#7A3E5A",
+  rose: "#F2C8C0",
+  ok: "#3F8C5A",
+  warn: "#C77E1C",
+  serif: "'Newsreader', ui-serif, Georgia, serif",
+  sans: "'Plus Jakarta Sans', system-ui, sans-serif",
+  mono: "'JetBrains Mono', ui-monospace, monospace",
+} as const;
+
+export type WSColor = keyof typeof WS;
