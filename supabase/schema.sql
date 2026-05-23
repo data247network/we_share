@@ -254,11 +254,11 @@ create policy "Users see own transactions" on public.wallet_transactions for sel
 -- ─── FUNCTIONS ───────────────────────────────────────────────────────────────
 
 -- Auto-generate pool_ref
+create sequence if not exists pool_ref_seq start 1000;
+
 create or replace function generate_pool_ref() returns text as $$
   select 'WS-' || lpad(nextval('pool_ref_seq')::text, 4, '0');
 $$ language sql;
-
-create sequence if not exists pool_ref_seq start 1000;
 
 -- Auto-fill pool_ref on insert
 create or replace function set_pool_ref() returns trigger as $$
