@@ -29,13 +29,13 @@ export function MktNav({ active = "Browse" }: { active?: string }) {
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: `1px solid ${WS.line}`, borderRadius: 10, padding: "7px 12px", width: 320 }}>
         {Icons.search(WS.mute, 14)}
-        <span style={{ fontSize: 12.5, color: WS.mute }}>Search wholesale items near you…</span>
+        <span style={{ fontSize: 12.5, color: WS.mute }}>Search wholesale deals near you…</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: WS.ink2 }}>
-        {Icons.pin(WS.terra, 14)} Yaba
+        {Icons.pin(WS.terra, 14)} Newcastle
       </div>
-      <Btn tone="ghost" size="sm">Sign in</Btn>
-      <Btn tone="primary" size="sm">Sign up</Btn>
+      <Btn tone="ghost" size="sm" onClick={() => window.location.href = "/auth/login"}>Sign in</Btn>
+      <Btn tone="primary" size="sm" onClick={() => window.location.href = "/auth/signup"}>Sign up</Btn>
     </div>
   );
 }

@@ -19,11 +19,18 @@ export default function LoginPage() {
     setError(null);
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setError(error.message);
-    } else {
-      window.location.href = "/";
+    } else if (data.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+      const role = profile?.role ?? "buyer";
+      const redirect = role === "shop" ? "/shop/dashboard" : role === "rider" ? "/rider/route" : role === "admin" ? "/admin" : "/m";
+      window.location.href = redirect;
     }
     setLoading(false);
   }

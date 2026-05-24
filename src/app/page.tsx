@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { WS } from "@/components/brand/tokens";
 import { Card, ImgSlot, Bar } from "@/components/brand";
 import { Pill } from "@/components/brand/Pill";
@@ -8,28 +9,87 @@ import { AvatarStack, Avatar } from "@/components/brand/Avatar";
 import { FractionBadge } from "@/components/brand/FractionBadge";
 import { Icons } from "@/components/brand/Icons";
 import { MktNav } from "@/components/buyer-web/MktNav";
+import { CountdownTimer } from "@/components/shared/CountdownTimer";
+import { createClient } from "@/lib/supabase/client";
 
-const categories = ["All", "Meat & poultry", "Drinks", "Pantry staples", "Produce", "Frozen", "HORECA"];
-
-const pools = [
-  { t: "Premium Ribeye · 4 kg", shop: "Tunde's Butchery", img: "meat" as const, f: 3, n: 4, h: 6, p: "30.50", save: "27%" },
-  { t: "Stout · 24-pack", shop: "Hopline Drinks", img: "drink" as const, f: 2, n: 4, h: 14, p: "18.00", save: "18%" },
-  { t: "Chicken thighs · 5 kg", shop: "Farmly Lagos", img: "meat" as const, f: 4, n: 4, h: 0, p: "14.40", save: "32%", ready: true },
-  { t: "Craft IPA · 12-pack", shop: "Hopline Drinks", img: "drink" as const, f: 1, n: 2, h: 22, p: "11.00", save: "21%" },
-  { t: "Whole goat · halved", shop: "Tunde's Butchery", img: "meat" as const, f: 1, n: 2, h: 18, p: "34.00", save: "25%" },
-  { t: "Beef shank · 3 kg", shop: "Tunde's Butchery", img: "meat" as const, f: 2, n: 3, h: 9, p: "22.00", save: "22%" },
-  { t: "Cider · 12-pack", shop: "Hopline Drinks", img: "drink" as const, f: 3, n: 4, h: 5, p: "9.80", save: "18%" },
-  { t: "Lamb chops · 4 kg", shop: "Farmly Lagos", img: "meat" as const, f: 2, n: 4, h: 12, p: "27.00", save: "24%" },
-];
+const categories = ["All", "Meat & poultry", "Drinks", "Pantry staples", "Produce", "Frozen"];
 
 const howItWorks = [
-  { n: 1, t: "Shops list a case", s: "Meat, drinks, pantry — at true wholesale.", tone: WS.terraLt, fg: WS.terraDk },
-  { n: 2, t: "Neighbours pool up", s: "Claim a 1/2, 1/4 or 1/8 portion. Invite friends.", tone: WS.sageLt, fg: "#33623A" },
-  { n: 3, t: "Pool fills, case ships", s: "Only charged once the case is full.", tone: WS.butterLt, fg: "#8A6914" },
-  { n: 4, t: "Rider drops your share", s: "Each member receives their portion.", tone: WS.rose, fg: WS.plum },
+  { n: 1, t: "Shop lists a case", s: "Tesco, Aldi, Morrisons and local shops post wholesale cases.", tone: WS.terraLt, fg: WS.terraDk },
+  { n: 2, t: "Neighbours pool up", s: "Claim a 1/2 or 1/4 share. Invite friends in your street.", tone: WS.sageLt, fg: "#33623A" },
+  { n: 3, t: "Pool fills, case ships", s: "Only charged once the case is full. No risk.", tone: WS.butterLt, fg: "#8A6914" },
+  { n: 4, t: "Rider drops your share", s: "Each member receives their portion at home.", tone: WS.rose, fg: WS.plum },
 ];
 
+const shopLogos = [
+  { name: "Tesco", logo: "https://logo.clearbit.com/tesco.com", slug: "tesco-metro-newcastle" },
+  { name: "Aldi", logo: "https://logo.clearbit.com/aldi.co.uk", slug: "aldi-gateshead" },
+  { name: "Lidl", logo: "https://logo.clearbit.com/lidl.co.uk", slug: "lidl-sunderland" },
+  { name: "Morrisons", logo: "https://logo.clearbit.com/morrisons.com", slug: "morrisons-newcastle" },
+  { name: "Asda", logo: "https://logo.clearbit.com/asda.com", slug: "asda-byker" },
+  { name: "Hutchinson's", logo: "https://logo.clearbit.com/hutchinsons.co.uk", slug: "hutchinsons-international" },
+];
+
+interface Pool {
+  id: string;
+  pool_ref: string;
+  total_portions: number;
+  filled_portions: number;
+  price_per_portion_gbp: number;
+  expires_at: string;
+  items: { name: string; image_urls: string[]; retail_price_gbp: number; category: string } | null;
+  shops: { name: string; slug: string; logo_url: string; address: string } | null;
+}
+
+function savePercent(pool: Pool): number {
+  if (!pool.items) return 0;
+  const wholesale = pool.price_per_portion_gbp * pool.total_portions;
+  return Math.round((1 - wholesale / pool.items.retail_price_gbp) * 100);
+}
+
+function isWeekendDeal(pool: Pool): boolean {
+  const d = new Date(pool.expires_at);
+  const day = d.getDay();
+  const ms = d.getTime() - Date.now();
+  return (day === 5 || day === 6) && ms > 0 && ms < 7 * 86400000;
+}
+
 export default function BuyerWebHome() {
+  const [pools, setPools] = useState<Pool[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState("All");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("pools")
+      .select(`
+        id, pool_ref, total_portions, filled_portions, price_per_portion_gbp, expires_at,
+        items:item_id (name, image_urls, retail_price_gbp, category),
+        shops:shop_id (name, slug, logo_url, address)
+      `)
+      .eq("status", "open")
+      .order("expires_at", { ascending: true })
+      .then(({ data }) => {
+        setPools((data as Pool[]) || []);
+        setLoading(false);
+      });
+  }, []);
+
+  const categoryMap: Record<string, string> = {
+    "Meat & poultry": "meat_poultry",
+    "Drinks": "drinks",
+    "Pantry staples": "pantry",
+    "Produce": "produce",
+    "Frozen": "frozen",
+  };
+
+  const filtered = activeCategory === "All"
+    ? pools
+    : pools.filter(p => p.items?.category === categoryMap[activeCategory]);
+
+  const weekendDeals = pools.filter(isWeekendDeal);
+
   return (
     <div style={{ background: WS.cream, fontFamily: WS.sans, color: WS.ink, minHeight: "100dvh" }}>
       <MktNav />
@@ -37,98 +97,219 @@ export default function BuyerWebHome() {
       {/* Hero */}
       <div style={{ padding: "40px 36px 32px", display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 32, alignItems: "center" }}>
         <div>
-          <Pill tone="terra" size="lg" style={{ marginBottom: 14 }}>NEW · WHOLESALE SHARES</Pill>
-          <div style={{ fontFamily: WS.serif, fontSize: 56, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1, color: WS.ink }}>
+          <Pill tone="terra" size="lg" style={{ marginBottom: 14 }}>NORTH EAST ENGLAND · WHOLESALE SHARES</Pill>
+          <div style={{ fontFamily: WS.serif, fontSize: 52, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1, color: WS.ink }}>
             Buy in bulk.<br />
             <span style={{ fontStyle: "italic", color: WS.terra }}>Share</span> with neighbours.
           </div>
           <div style={{ fontSize: 15, color: WS.ink2, marginTop: 16, maxWidth: 480, lineHeight: 1.55 }}>
-            Local shops list wholesale cases of meat, drinks and pantry goods. Pool with 1–7 others, save 20–35%, and we deliver each share.
+            Newcastle, Gateshead, Sunderland and beyond. Local supermarkets list wholesale cases — pool with neighbours, save 20–40%, and get your share delivered.
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
-            <Btn tone="primary" size="lg">Browse open pools</Btn>
+            <Btn tone="primary" size="lg" onClick={() => window.location.href = "/auth/signup"}>Browse open pools</Btn>
             <Btn tone="ghost" size="lg">How it works →</Btn>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 22, fontSize: 12, color: WS.ink2 }}>
-            <AvatarStack names={["Ada A", "Joy M", "Bola K", "Sam O", "Tina O"]} more={2842} size={22} />
-            <span>2,847 neighbours pooling this week</span>
+            <AvatarStack names={["Sam T", "Jade H", "Ravi K", "Mo A", "Chloe D"]} more={1240} size={22} />
+            <span>1,245 neighbours pooling this week</span>
           </div>
         </div>
 
-        {/* Illustrated card stack */}
+        {/* Hero card stack */}
         <div style={{ position: "relative", paddingTop: 40, paddingBottom: 40 }}>
           <Card p={0} style={{ overflow: "hidden", transform: "rotate(-3deg)", boxShadow: "0 20px 50px rgba(42,31,27,0.12)" }}>
-            <ImgSlot label="ribeye · 4kg case" tone="meat" h={220} r={0} />
+            {pools[0]?.items?.image_urls?.[0]
+              ? <img src={pools[0].items.image_urls[0]} alt="" style={{ width: "100%", height: 220, objectFit: "cover", display: "block" }} />
+              : <ImgSlot label="ribeye · 4kg case" tone="meat" h={220} r={0} />
+            }
             <div style={{ padding: 16 }}>
-              <Pill tone="solid" size="xs" style={{ marginBottom: 6 }}>3 / 4 IN POOL</Pill>
-              <div style={{ fontFamily: WS.serif, fontSize: 18, fontWeight: 600 }}>Premium Ribeye, dry-aged</div>
-              <div style={{ fontSize: 12, color: WS.ink2, marginTop: 2 }}>Tunde's Butchery · 1.2 km</div>
+              <Pill tone="solid" size="xs" style={{ marginBottom: 6 }}>
+                {pools[0] ? `${pools[0].filled_portions} / ${pools[0].total_portions} IN POOL` : "3 / 4 IN POOL"}
+              </Pill>
+              <div style={{ fontFamily: WS.serif, fontSize: 18, fontWeight: 600 }}>
+                {pools[0]?.items?.name || "British Ribeye, dry-aged"}
+              </div>
+              <div style={{ fontSize: 12, color: WS.ink2, marginTop: 2 }}>
+                {pools[0]?.shops?.name || "Tesco Metro Newcastle"} · 1.2 km
+              </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
-                <FractionBadge filled={3} total={4} size={34} />
-                <span style={{ fontFamily: WS.serif, fontSize: 22, fontWeight: 700, color: WS.terraDk }}>£30.50</span>
+                <FractionBadge filled={pools[0]?.filled_portions ?? 3} total={pools[0]?.total_portions ?? 4} size={34} />
+                <span style={{ fontFamily: WS.serif, fontSize: 22, fontWeight: 700, color: WS.terraDk }}>
+                  £{pools[0] ? (pools[0].price_per_portion_gbp / 100).toFixed(2) : "18.00"}
+                </span>
               </div>
             </div>
           </Card>
           <Card p={12} style={{ position: "absolute", right: -10, top: 10, width: 200, transform: "rotate(5deg)", background: WS.butterLt, border: "none", boxShadow: "0 12px 30px rgba(0,0,0,0.08)" }}>
-            <div style={{ fontFamily: WS.serif, fontSize: 14, fontWeight: 600, color: "#8A6914" }}>You saved £11.50</div>
-            <div style={{ fontSize: 11, color: "#8A6914", opacity: 0.8 }}>vs retail · this share</div>
+            <div style={{ fontFamily: WS.serif, fontSize: 14, fontWeight: 600, color: "#8A6914" }}>
+              {pools[0] ? `You saved £${((pools[0].items!.retail_price_gbp - pools[0].price_per_portion_gbp * pools[0].total_portions) / 100).toFixed(2)}` : "You saved £28.00"}
+            </div>
+            <div style={{ fontSize: 11, color: "#8A6914", opacity: 0.8 }}>vs retail · this case</div>
           </Card>
           <Card p={12} style={{ position: "absolute", left: -20, bottom: 10, width: 170, transform: "rotate(-6deg)", background: WS.sageLt, border: "none", boxShadow: "0 12px 30px rgba(0,0,0,0.08)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Avatar name="Joy M" size={26} />
-              <div style={{ fontSize: 11, color: "#33623A", lineHeight: 1.3 }}><b>Joy</b> joined your pool</div>
+              <Avatar name="Jade H" size={26} />
+              <div style={{ fontSize: 11, color: "#33623A", lineHeight: 1.3 }}><b>Jade</b> joined your pool</div>
             </div>
           </Card>
         </div>
       </div>
 
-      {/* Category strip */}
-      <div style={{ padding: "12px 36px 0" }}>
-        <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 6 }}>
-          {categories.map((c, i) => (
-            <Pill key={i} tone={i === 0 ? "solid" : "line"} size="lg">{c}</Pill>
+      {/* Shop logos strip */}
+      <div style={{ background: "#fff", borderTop: `1px solid ${WS.line}`, borderBottom: `1px solid ${WS.line}`, padding: "16px 36px" }}>
+        <div style={{ fontSize: 11, fontFamily: WS.mono, color: WS.mute, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 14 }}>
+          Wholesale from your local shops
+        </div>
+        <div style={{ display: "flex", gap: 28, alignItems: "center", overflowX: "auto" }}>
+          {shopLogos.map((s) => (
+            <div key={s.slug} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer", opacity: 0.85 }}
+              onClick={() => window.location.href = `/auth/signup`}>
+              <img
+                src={s.logo}
+                alt={s.name}
+                style={{ height: 32, width: 80, objectFit: "contain", filter: "grayscale(20%)" }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+              <span style={{ fontSize: 10, color: WS.ink2, fontFamily: WS.mono }}>{s.name}</span>
+            </div>
           ))}
         </div>
       </div>
 
-      {/* Pools grid */}
-      <div style={{ padding: "24px 36px 40px" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
-          <div style={{ fontFamily: WS.serif, fontSize: 24, fontWeight: 600, letterSpacing: "-0.015em" }}>Pools open near you</div>
-          <div style={{ fontSize: 12, color: WS.ink2 }}>Sorted by: <b style={{ color: WS.ink }}>Time to fill ↑</b></div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
-          {pools.map((p, i) => (
-            <Card key={i} p={0} style={{ overflow: "hidden", display: "flex", flexDirection: "column", cursor: "pointer" }}>
-              <div style={{ position: "relative" }}>
-                <ImgSlot label="" tone={p.img} h={130} r={0} />
-                <div style={{ position: "absolute", top: 8, left: 8, display: "flex", gap: 5 }}>
-                  {p.ready
-                    ? <Pill tone="sage" size="xs">✓ Ready to ship</Pill>
-                    : <Pill tone="solid" size="xs">⏱ {p.h}h left</Pill>}
-                </div>
-                <div style={{ position: "absolute", top: 8, right: 8 }}>
-                  <Pill tone="butter" size="xs">−{p.save}</Pill>
-                </div>
+      {/* Weekend Flash Deals */}
+      {weekendDeals.length > 0 && (
+        <div style={{ padding: "28px 36px 0" }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
+            <div>
+              <div style={{ fontFamily: WS.serif, fontSize: 22, fontWeight: 600, letterSpacing: "-0.015em" }}>
+                Weekend Flash Deals
               </div>
-              <div style={{ padding: "12px 14px 14px", flex: 1, display: "flex", flexDirection: "column" }}>
-                <div style={{ fontFamily: WS.serif, fontSize: 14.5, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.005em" }}>{p.t}</div>
-                <div style={{ fontSize: 11.5, color: WS.ink2, marginTop: 3 }}>{p.shop}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-                  <FractionBadge filled={p.f} total={p.n} size={22} ring={false} />
-                  <Bar value={(p.f / p.n) * 100} h={5} style={{ flex: 1 }} />
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: `1px solid ${WS.line2}` }}>
-                  <div>
-                    <span style={{ fontFamily: WS.mono, fontSize: 10, color: WS.mute }}>1/{p.n} SHARE</span>
-                    <div style={{ fontFamily: WS.serif, fontWeight: 700, fontSize: 18, color: WS.ink }}>£{p.p}</div>
+              <div style={{ fontSize: 12, color: WS.ink2, marginTop: 3 }}>Friday &amp; Saturday wholesale drops — pools close when they fill</div>
+            </div>
+            <Pill tone="terra" size="sm">ENDS THIS WEEKEND</Pill>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+            {weekendDeals.map((p) => (
+              <Card key={p.id} p={0} style={{ overflow: "hidden", cursor: "pointer", border: `2px solid ${WS.terraLt}` }}
+                onClick={() => window.location.href = "/auth/signup"}>
+                <div style={{ position: "relative" }}>
+                  {p.items?.image_urls?.[0]
+                    ? <img src={p.items.image_urls[0]} alt="" style={{ width: "100%", height: 130, objectFit: "cover", display: "block" }} />
+                    : <ImgSlot label="" tone="meat" h={130} r={0} />
+                  }
+                  <div style={{ position: "absolute", top: 8, left: 8 }}>
+                    <Pill tone="terra" size="xs">FLASH DEAL</Pill>
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: WS.terraDk }}>Join →</span>
+                  <div style={{ position: "absolute", top: 8, right: 8 }}>
+                    <Pill tone="butter" size="xs">−{savePercent(p)}%</Pill>
+                  </div>
                 </div>
-              </div>
-            </Card>
+                <div style={{ padding: "12px 14px 14px" }}>
+                  <div style={{ fontFamily: WS.serif, fontSize: 14.5, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.005em" }}>
+                    {p.items?.name}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: WS.ink2, marginTop: 3, marginBottom: 8 }}>{p.shops?.name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <FractionBadge filled={p.filled_portions} total={p.total_portions} size={22} ring={false} />
+                    <Bar value={(p.filled_portions / p.total_portions) * 100} h={5} style={{ flex: 1 }} />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: `1px solid ${WS.line2}` }}>
+                    <div>
+                      <span style={{ fontFamily: WS.mono, fontSize: 10, color: WS.mute }}>1/{p.total_portions} SHARE</span>
+                      <div style={{ fontFamily: WS.serif, fontWeight: 700, fontSize: 18, color: WS.ink }}>
+                        £{(p.price_per_portion_gbp / 100).toFixed(2)}
+                      </div>
+                    </div>
+                    <CountdownTimer expiresAt={p.expires_at} />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Category strip */}
+      <div style={{ padding: "24px 36px 0" }}>
+        <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 6 }}>
+          {categories.map((c, i) => (
+            <Pill key={i} tone={c === activeCategory ? "solid" : "line"} size="lg"
+              style={{ cursor: "pointer", flexShrink: 0 }}
+              onClick={() => setActiveCategory(c)}>{c}</Pill>
           ))}
         </div>
+      </div>
+
+      {/* All pools grid */}
+      <div style={{ padding: "20px 36px 40px" }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ fontFamily: WS.serif, fontSize: 24, fontWeight: 600, letterSpacing: "-0.015em" }}>
+            {loading ? "Loading pools…" : `${filtered.length} pools open near you`}
+          </div>
+          <div style={{ fontSize: 12, color: WS.ink2 }}>Sorted by: <b style={{ color: WS.ink }}>Closing soonest ↑</b></div>
+        </div>
+
+        {loading ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i} p={0} style={{ overflow: "hidden", opacity: 0.4 }}>
+                <ImgSlot label="" tone="meat" h={130} r={0} />
+                <div style={{ padding: "12px 14px 14px" }}>
+                  <div style={{ background: WS.line, height: 14, borderRadius: 4, width: "80%", marginBottom: 6 }} />
+                  <div style={{ background: WS.line2, height: 10, borderRadius: 4, width: "50%" }} />
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            {filtered.map((p) => {
+              const save = savePercent(p);
+              const isFresh = p.filled_portions === p.total_portions;
+              return (
+                <Card key={p.id} p={0} style={{ overflow: "hidden", display: "flex", flexDirection: "column", cursor: "pointer" }}
+                  onClick={() => window.location.href = "/auth/signup"}>
+                  <div style={{ position: "relative" }}>
+                    {p.items?.image_urls?.[0]
+                      ? <img src={p.items.image_urls[0]} alt="" style={{ width: "100%", height: 130, objectFit: "cover", display: "block" }} />
+                      : <ImgSlot label="" tone="meat" h={130} r={0} />
+                    }
+                    <div style={{ position: "absolute", top: 8, left: 8, display: "flex", gap: 5 }}>
+                      {isFresh
+                        ? <Pill tone="sage" size="xs">Ready to ship</Pill>
+                        : <CountdownTimer expiresAt={p.expires_at} style={{ background: "rgba(0,0,0,0.55)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontSize: 10.5 }} />
+                      }
+                    </div>
+                    {save > 0 && (
+                      <div style={{ position: "absolute", top: 8, right: 8 }}>
+                        <Pill tone="butter" size="xs">−{save}%</Pill>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: "12px 14px 14px", flex: 1, display: "flex", flexDirection: "column" }}>
+                    <div style={{ fontFamily: WS.serif, fontSize: 14.5, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.005em" }}>
+                      {p.items?.name}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: WS.ink2, marginTop: 3 }}>{p.shops?.name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                      <FractionBadge filled={p.filled_portions} total={p.total_portions} size={22} ring={false} />
+                      <Bar value={(p.filled_portions / p.total_portions) * 100} h={5} style={{ flex: 1 }} />
+                    </div>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: `1px solid ${WS.line2}` }}>
+                      <div>
+                        <span style={{ fontFamily: WS.mono, fontSize: 10, color: WS.mute }}>1/{p.total_portions} SHARE</span>
+                        <div style={{ fontFamily: WS.serif, fontWeight: 700, fontSize: 18, color: WS.ink }}>
+                          £{(p.price_per_portion_gbp / 100).toFixed(2)}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: WS.terraDk }}>Join →</span>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* How it works */}
@@ -142,6 +323,17 @@ export default function BuyerWebHome() {
               <div style={{ fontSize: 12.5, color: WS.ink2, marginTop: 4, lineHeight: 1.5 }}>{s.s}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: "28px 36px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: WS.mute }}>
+        <div style={{ fontFamily: WS.serif, fontWeight: 600, fontSize: 14, color: WS.ink }}>WeShare</div>
+        <div>Serving Newcastle · Gateshead · Sunderland · Middlesbrough · Durham</div>
+        <div style={{ display: "flex", gap: 16 }}>
+          <span style={{ cursor: "pointer" }}>Terms</span>
+          <span style={{ cursor: "pointer" }}>Privacy</span>
+          <span style={{ cursor: "pointer" }}>Contact</span>
         </div>
       </div>
     </div>
