@@ -73,7 +73,7 @@ export default function BuyerHome() {
       .eq("status", "open")
       .order("expires_at", { ascending: true })
       .then(({ data }) => {
-        setPools((data as Pool[]) || []);
+        setPools((data as unknown as Pool[]) || []);
         setLoading(false);
       });
   }, []);

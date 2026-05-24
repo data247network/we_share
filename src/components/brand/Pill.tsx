@@ -18,6 +18,7 @@ interface PillProps {
   tone?: PillTone;
   size?: PillSize;
   style?: CSSProperties;
+  onClick?: () => void;
 }
 
 const tones: Record<PillTone, { bg: string; fg: string; br?: string }> = {
@@ -41,13 +42,15 @@ export function Pill({
   tone = "ink",
   size = "sm",
   style = {},
+  onClick,
 }: PillProps) {
   const t = tones[tone];
   const sz = sizes[size];
 
   return (
     <span
-      style={{
+      onClick={onClick}
+      style={{ cursor: onClick ? "pointer" : undefined,
         display: "inline-flex",
         alignItems: "center",
         gap: 5,
