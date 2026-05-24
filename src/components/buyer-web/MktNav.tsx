@@ -15,7 +15,7 @@ export function MktNav({ active = "Browse" }: { active?: string }) {
       background: "rgba(251,245,236,0.92)", backdropFilter: "blur(20px)",
       position: "sticky", top: 0, zIndex: 5,
     }}>
-      <Logo size={20} />
+      <span style={{ cursor: "pointer" }} onClick={() => window.location.href = "/"}><Logo size={20} /></span>
       <nav style={{ display: "flex", gap: 18, marginLeft: 20 }}>
         {navLinks.map((n, i) => (
           <span key={i} style={{

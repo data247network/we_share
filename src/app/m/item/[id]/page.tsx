@@ -13,6 +13,10 @@ import { FractionBadge } from "@/components/brand/FractionBadge";
 import { Icons } from "@/components/brand/Icons";
 import { CountdownTimer } from "@/components/shared/CountdownTimer";
 import { createClient } from "@/lib/supabase/client";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 interface PoolDetail {
   id: string;
@@ -41,8 +45,91 @@ interface PoolDetail {
   } | null;
 }
 
-type Step = "view" | "address" | "joining" | "joined" | "error";
+type Step = "view" | "address" | "joining" | "payment" | "joined" | "error";
 
+// ─── Payment screen (must be inside <Elements>) ──────────────────────────────
+function PaymentScreen({
+  amountPence,
+  selectedPortions,
+  totalPortions,
+  itemName,
+  onSuccess,
+  onError,
+}: {
+  amountPence: number;
+  selectedPortions: number;
+  totalPortions: number;
+  itemName: string;
+  onSuccess: () => void;
+  onError: (msg: string) => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [paying, setPaying] = useState(false);
+
+  async function handleConfirm() {
+    if (!stripe || !elements) return;
+    setPaying(true);
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { return_url: `${window.location.origin}/m/pools` },
+      redirect: "if_required",
+    });
+    if (error) {
+      onError(error.message ?? "Payment authorization failed. Please try again.");
+    } else {
+      onSuccess();
+    }
+    setPaying(false);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: WS.cream, color: WS.ink, fontFamily: WS.sans }}>
+      <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ fontFamily: WS.serif, fontSize: 18, fontWeight: 600 }}>Authorize card</div>
+      </div>
+
+      <div style={{ flex: 1, padding: "20px 16px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+        {/* Summary card */}
+        <div style={{ background: "#fff", borderRadius: 16, padding: 16, border: `1px solid ${WS.line}` }}>
+          <div style={{ fontFamily: WS.mono, fontSize: 10, color: WS.mute, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>Order summary</div>
+          <div style={{ fontSize: 13.5, color: WS.ink, marginBottom: 4 }}>
+            {selectedPortions}/{totalPortions} share · <b>{itemName}</b>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", paddingTop: 8, borderTop: `1px solid ${WS.line2}`, marginTop: 4 }}>
+            <span style={{ fontFamily: WS.serif, fontWeight: 600, fontSize: 15 }}>Total held</span>
+            <span style={{ fontFamily: WS.serif, fontWeight: 700, fontSize: 18, color: WS.ink }}>£{(amountPence / 100).toFixed(2)}</span>
+          </div>
+        </div>
+
+        {/* Notice */}
+        <div style={{ background: WS.butterLt, borderRadius: 12, padding: "10px 14px", fontSize: 12.5, color: "#8A6914", lineHeight: 1.5 }}>
+          🔒 Your card is <b>authorized but not charged</b> now. You will only be billed when the pool fills. If it doesn't fill, there is no charge.
+        </div>
+
+        {/* Stripe PaymentElement */}
+        <div style={{ background: "#fff", borderRadius: 16, padding: 16, border: `1px solid ${WS.line}` }}>
+          <PaymentElement options={{ layout: "accordion" }} />
+        </div>
+      </div>
+
+      <div style={{ padding: "12px 16px 28px", borderTop: `1px solid ${WS.line}`, background: "rgba(251,245,236,0.95)", backdropFilter: "blur(20px)" }}>
+        <Btn
+          tone="primary" size="lg" block
+          onClick={handleConfirm}
+          disabled={paying || !stripe || !elements}
+        >
+          {paying ? "Authorizing…" : `Authorize £${(amountPence / 100).toFixed(2)} — charge when pool fills`}
+        </Btn>
+        <div style={{ textAlign: "center", fontSize: 11, color: WS.mute, marginTop: 8 }}>
+          Secured by Stripe · No charge until pool is full
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function ItemDetail() {
   const params = useParams();
   const id = params.id as string;
@@ -53,13 +140,20 @@ export default function ItemDetail() {
   const [step, setStep] = useState<Step>("view");
   const [address, setAddress] = useState("");
   const [joinError, setJoinError] = useState("");
-  const [joinResult, setJoinResult] = useState<{ member_id: string; amount_pence: number } | null>(null);
+  const [joinResult, setJoinResult] = useState<{ member_id: string; amount_pence: number; client_secret: string } | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [myMembership, setMyMembership] = useState<{ id: string; portions: number } | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
 
-    supabase.auth.getUser().then(({ data: { user } }) => setIsLoggedIn(!!user));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsLoggedIn(!!user);
+      if (user) {
+        supabase.from("pool_members").select("id, portions").eq("pool_id", id).eq("buyer_id", user.id).single()
+          .then(({ data }) => { if (data) setMyMembership(data); });
+      }
+    });
 
     supabase
       .from("pools")
@@ -72,8 +166,7 @@ export default function ItemDetail() {
       .single()
       .then(({ data }) => {
         if (data) {
-          const p = data as unknown as PoolDetail;
-          setPool(p);
+          setPool(data as unknown as PoolDetail);
           setSelectedPortions(1);
         }
         setLoading(false);
@@ -108,7 +201,7 @@ export default function ItemDetail() {
         return;
       }
       setJoinResult(json);
-      setStep("joined");
+      setStep("payment");
     } catch {
       setJoinError("Network error. Please try again.");
       setStep("error");
@@ -141,7 +234,7 @@ export default function ItemDetail() {
   const portionWeightKg = item ? (caseWeightKg / pool.total_portions) * selectedPortions : 0;
   const savePercent = item ? Math.round((1 - (pool.price_per_portion_gbp * pool.total_portions) / item.retail_price_gbp) * 100) : 0;
 
-  // "Joined!" confirmation screen
+  // ── Confirmation screen ──
   if (step === "joined" && joinResult) {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: WS.cream, color: WS.ink, fontFamily: WS.sans }}>
@@ -154,7 +247,7 @@ export default function ItemDetail() {
           <div style={{ background: "#fff", border: `1px solid ${WS.line}`, borderRadius: 16, padding: 20, width: "100%", maxWidth: 320 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: WS.ink2, marginBottom: 8 }}>
               <span>Your share</span>
-              <span style={{ color: WS.ink, fontWeight: 600 }}>£{totalForSelection.toFixed(2)}</span>
+              <span style={{ color: WS.ink, fontWeight: 600 }}>£{(joinResult.amount_pence / 100).toFixed(2)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: WS.ink2 }}>
               <span>Pool ref</span>
@@ -165,17 +258,39 @@ export default function ItemDetail() {
               <div style={{ fontSize: 11.5, color: WS.ink2, marginTop: 6 }}>{pool.filled_portions + selectedPortions} of {pool.total_portions} portions filled</div>
             </div>
           </div>
-          <Pill tone="terra" size="sm">Payment held until pool fills</Pill>
+          <Pill tone="terra" size="sm">Card authorized · charged only when pool fills</Pill>
         </div>
         <div style={{ padding: "12px 16px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
-          <Btn tone="primary" size="lg" block onClick={() => window.location.href = "/m"}>Back to home</Btn>
-          <Btn tone="ghost" size="lg" block onClick={() => window.location.href = "/m"}>View my pools →</Btn>
+          <Btn tone="primary" size="lg" block onClick={() => window.location.href = "/m/pools"}>View my pools →</Btn>
+          <Btn tone="ghost" size="lg" block onClick={() => window.location.href = "/m"}>Back to home</Btn>
         </div>
       </div>
     );
   }
 
-  // Address collection screen
+  // ── Payment / Stripe Elements screen ──
+  if (step === "payment" && joinResult?.client_secret) {
+    return (
+      <Elements
+        stripe={stripePromise}
+        options={{
+          clientSecret: joinResult.client_secret,
+          appearance: { theme: "stripe", variables: { colorPrimary: WS.terra, borderRadius: "12px", fontFamily: WS.sans } },
+        }}
+      >
+        <PaymentScreen
+          amountPence={joinResult.amount_pence}
+          selectedPortions={selectedPortions}
+          totalPortions={pool.total_portions}
+          itemName={item?.name ?? ""}
+          onSuccess={() => setStep("joined")}
+          onError={(msg) => { setJoinError(msg); setStep("error"); }}
+        />
+      </Elements>
+    );
+  }
+
+  // ── Address collection screen ──
   if (step === "address") {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: WS.cream, color: WS.ink, fontFamily: WS.sans }}>
@@ -191,13 +306,9 @@ export default function ItemDetail() {
             <textarea
               value={address}
               onChange={e => setAddress(e.target.value)}
-              placeholder="Your full delivery address…&#10;e.g. 14 Shields Road, Byker, Newcastle NE6 1BX"
+              placeholder={"Your full delivery address…\ne.g. 14 Shields Road, Byker, Newcastle NE6 1BX"}
               rows={4}
-              style={{
-                width: "100%", padding: "14px", border: "none", background: "transparent",
-                fontFamily: WS.sans, fontSize: 14, color: WS.ink, resize: "none", outline: "none",
-                boxSizing: "border-box", borderRadius: 16,
-              }}
+              style={{ width: "100%", padding: "14px", border: "none", background: "transparent", fontFamily: WS.sans, fontSize: 14, color: WS.ink, resize: "none", outline: "none", boxSizing: "border-box", borderRadius: 16 }}
             />
           </Card>
           <div style={{ background: WS.butterLt, borderRadius: 12, padding: "10px 14px", fontSize: 12.5, color: "#8A6914", lineHeight: 1.5 }}>
@@ -205,19 +316,15 @@ export default function ItemDetail() {
           </div>
         </div>
         <div style={{ padding: "12px 16px 24px" }}>
-          <Btn
-            tone="primary" size="lg" block
-            onClick={submitJoin}
-            disabled={!address.trim()}
-          >
-            Confirm and join pool — £{totalForSelection.toFixed(2)}
+          <Btn tone="primary" size="lg" block onClick={submitJoin} disabled={!address.trim()}>
+            Next — add payment details →
           </Btn>
         </div>
       </div>
     );
   }
 
-  // Joining spinner
+  // ── Joining spinner ──
   if (step === "joining") {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: WS.cream, alignItems: "center", justifyContent: "center", gap: 14, color: WS.ink2 }}>
@@ -228,7 +335,7 @@ export default function ItemDetail() {
     );
   }
 
-  // Error screen
+  // ── Error screen ──
   if (step === "error") {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: WS.cream, color: WS.ink, fontFamily: WS.sans, alignItems: "center", justifyContent: "center", padding: 32, gap: 16, textAlign: "center" }}>
@@ -240,13 +347,11 @@ export default function ItemDetail() {
     );
   }
 
-  // Main view
+  // ── Main view ──
   const portionOptions = (() => {
     const opts = [];
     for (let i = 1; i <= pool.total_portions; i++) {
-      if (pool.total_portions % i === 0) {
-        opts.push(i);
-      }
+      if (pool.total_portions % i === 0) opts.push(i);
     }
     return opts;
   })();
@@ -288,6 +393,20 @@ export default function ItemDetail() {
             {shop?.rating_avg ? <><span>·</span><span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>{Icons.star(WS.butter, 12)} {shop.rating_avg}</span></> : null}
           </div>
 
+          {/* Already joined banner */}
+          {myMembership && (
+            <div style={{ marginTop: 14, background: WS.sageLt, borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 13, color: "#33623A", fontWeight: 600 }}>
+                ✓ You've joined this pool ({myMembership.portions}/{pool.total_portions})
+              </div>
+              <button
+                onClick={() => window.location.href = `/m/pools/${myMembership.id}`}
+                style={{ background: "none", border: `1px solid #33623A`, borderRadius: 8, padding: "4px 10px", fontSize: 11.5, color: "#33623A", cursor: "pointer", fontWeight: 600 }}>
+                View →
+              </button>
+            </div>
+          )}
+
           {/* Pool status card */}
           <Card style={{ marginTop: 18 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -307,7 +426,7 @@ export default function ItemDetail() {
           </Card>
 
           {/* Portion selector */}
-          {spotsLeft > 0 && (
+          {spotsLeft > 0 && !myMembership && (
             <div style={{ marginTop: 22 }}>
               <SectionTitle>Choose your portion</SectionTitle>
               <div style={{ display: "grid", gridTemplateColumns: `repeat(${portionOptions.length}, 1fr)`, gap: 8 }}>
@@ -382,12 +501,17 @@ export default function ItemDetail() {
         }}>
           {Icons.share(WS.ink, 16)} Share
         </Btn>
-        {spotsLeft > 0
-          ? <Btn tone="primary" size="lg" block style={{ flex: 1 }} onClick={handleJoin}>
-              Join pool — £{totalForSelection.toFixed(2)}
-            </Btn>
-          : <Btn tone="ghost" size="lg" block style={{ flex: 1 }} disabled>Pool is full</Btn>
-        }
+        {myMembership ? (
+          <Btn tone="ghost" size="lg" block style={{ flex: 1 }} onClick={() => window.location.href = `/m/pools/${myMembership.id}`}>
+            View my membership →
+          </Btn>
+        ) : spotsLeft > 0 ? (
+          <Btn tone="primary" size="lg" block style={{ flex: 1 }} onClick={handleJoin}>
+            Join pool — £{totalForSelection.toFixed(2)}
+          </Btn>
+        ) : (
+          <Btn tone="ghost" size="lg" block style={{ flex: 1 }} disabled>Pool is full</Btn>
+        )}
       </div>
     </div>
   );

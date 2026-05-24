@@ -117,7 +117,7 @@ export default function MyPools() {
             const img = pool.items?.image_urls?.[0];
             return (
               <Card key={m.id} p={0} style={{ overflow: "hidden", cursor: "pointer" }}
-                onClick={() => window.location.href = `/m/item/${pool.id}`}>
+                onClick={() => window.location.href = `/m/pools/${m.id}`}>
                 <div style={{ display: "flex", gap: 0 }}>
                   <div style={{ width: 88, flexShrink: 0 }}>
                     {img

@@ -157,6 +157,23 @@ export default function BuyerWebHome() {
         </div>
       </div>
 
+      {/* Friday/Saturday banner */}
+      <div style={{ margin: "0 36px 0", padding: "14px 20px", background: `linear-gradient(135deg, ${WS.terra} 0%, ${WS.terraDk} 100%)`, borderRadius: 16, display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ fontSize: 28 }}>⚡</div>
+        <div>
+          <div style={{ fontFamily: WS.serif, fontWeight: 700, fontSize: 18, color: "#fff", letterSpacing: "-0.01em" }}>
+            Every Friday &amp; Saturday, the big sales happen here!
+          </div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 3 }}>
+            Flash deals · limited-time pools · wholesale prices for North East neighbours
+          </div>
+        </div>
+        <Btn tone="ghost" size="sm" style={{ marginLeft: "auto", flexShrink: 0, background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)" }}
+          onClick={() => window.location.href = "/auth/signup"}>
+          See deals →
+        </Btn>
+      </div>
+
       {/* Shop logos carousel */}
       <style>{`
         @keyframes logoScroll {

@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { WS } from "@/components/brand/tokens";
-import { SectionTitle, Card, ImgSlot } from "@/components/brand";
+import { SectionTitle, Card, ImgSlot, Bar } from "@/components/brand";
 import { Logo } from "@/components/brand/Logo";
 import { Pill } from "@/components/brand/Pill";
 import { Icons } from "@/components/brand/Icons";
-import { MobileScreen, TopBar, TabBar, SearchInput } from "@/components/buyer-mobile/MobileShell";
-import { PoolCard } from "@/components/buyer-mobile/PoolCard";
+import { FractionBadge } from "@/components/brand/FractionBadge";
+import { MobileScreen, TopBar, TabBar } from "@/components/buyer-mobile/MobileShell";
 import { CountdownTimer } from "@/components/shared/CountdownTimer";
 import { createClient } from "@/lib/supabase/client";
 
@@ -46,11 +46,52 @@ function isWeekendDeal(pool: Pool): boolean {
   return (day === 5 || day === 6) && ms > 0 && ms < 7 * 86400000;
 }
 
+function CompactPoolCard({ pool }: { pool: Pool }) {
+  const img = pool.items?.image_urls?.[0];
+  const save = savePercent(pool);
+  return (
+    <div
+      style={{ borderRadius: 14, overflow: "hidden", background: "#fff", border: `1px solid ${WS.line}`, cursor: "pointer" }}
+      onClick={() => window.location.href = `/m/item/${pool.id}`}>
+      <div style={{ position: "relative", height: 90 }}>
+        {img
+          ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          : <ImgSlot label="" tone="meat" h={90} r={0} />
+        }
+        {save > 0 && (
+          <div style={{ position: "absolute", top: 4, right: 4 }}>
+            <Pill tone="butter" size="xs">-{save}%</Pill>
+          </div>
+        )}
+      </div>
+      <div style={{ padding: "8px 8px 10px" }}>
+        <div style={{
+          fontFamily: WS.serif, fontSize: 11.5, fontWeight: 600, lineHeight: 1.3, marginBottom: 3,
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+        } as React.CSSProperties}>
+          {pool.items?.name}
+        </div>
+        <div style={{ fontSize: 10, color: WS.mute, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {pool.shops?.name}
+        </div>
+        <Bar value={(pool.filled_portions / pool.total_portions) * 100} h={3} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 5 }}>
+          <div style={{ fontFamily: WS.serif, fontWeight: 700, fontSize: 13, color: WS.terraDk }}>
+            £{(pool.price_per_portion_gbp / 100).toFixed(2)}
+          </div>
+          <FractionBadge filled={pool.filled_portions} total={pool.total_portions} size={18} ring={false} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BuyerHome() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(true);
   const [area, setArea] = useState("Newcastle");
   const [activeChip, setActiveChip] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
   const [userName, setUserName] = useState("there");
 
   useEffect(() => {
@@ -78,16 +119,26 @@ export default function BuyerHome() {
       });
   }, []);
 
-  const filtered = activeChip === "All"
+  const categoryFiltered = activeChip === "All"
     ? pools
     : pools.filter(p => p.items?.category === categoryMap[activeChip]);
+
+  const filtered = categoryFiltered.filter(p =>
+    !searchQuery ||
+    p.items?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.shops?.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const weekendDeals = pools.filter(isWeekendDeal);
 
   return (
     <MobileScreen footer={<TabBar active="home" />}>
       <TopBar
-        title={<Logo size={18} />}
+        title={
+          <span style={{ cursor: "pointer" }} onClick={() => window.location.href = "/m"}>
+            <Logo size={18} />
+          </span>
+        }
         left={
           <div style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: WS.ink2, padding: "8px 0" }}>
             {Icons.pin(WS.terra, 14)}
@@ -107,7 +158,7 @@ export default function BuyerHome() {
         }
       />
 
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 12 }}>
         <div style={{ fontFamily: WS.serif, fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
           Hi {userName} —{" "}
           <span style={{ color: WS.terra, fontStyle: "italic" }}>buy together,</span>
@@ -118,19 +169,48 @@ export default function BuyerHome() {
         </div>
       </div>
 
-      <div style={{ marginBottom: 14 }}><SearchInput /></div>
+      {/* Flash deals banner */}
+      <div style={{
+        background: `linear-gradient(135deg, ${WS.terra} 0%, ${WS.terraDk} 100%)`,
+        borderRadius: 14, padding: "12px 14px", marginBottom: 14,
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
+        <div style={{ fontSize: 22, flexShrink: 0 }}>⚡</div>
+        <div>
+          <div style={{ fontFamily: WS.serif, fontWeight: 700, fontSize: 13.5, color: "#fff", letterSpacing: "-0.01em" }}>
+            Every Friday &amp; Saturday — big sales happen here!
+          </div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>
+            Flash deals · limited portions · wholesale prices
+          </div>
+        </div>
+      </div>
+
+      {/* Functional search bar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${WS.line}`, borderRadius: 14, padding: "11px 14px", marginBottom: 14 }}>
+        {Icons.search(WS.mute, 17)}
+        <input
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search items, shops…"
+          style={{ flex: 1, border: "none", outline: "none", fontFamily: WS.sans, fontSize: 14, color: WS.ink, background: "transparent" }}
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery("")} style={{ background: "none", border: "none", cursor: "pointer", color: WS.mute, fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+        )}
+      </div>
 
       {/* Category chips */}
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 14, marginLeft: -2 }}>
-        {chips.map((c, i) => (
-          <Pill key={i} tone={c === activeChip ? "solid" : "line"} size="lg"
+        {chips.map((c) => (
+          <Pill key={c} tone={c === activeChip ? "solid" : "line"} size="lg"
             style={{ cursor: "pointer", flexShrink: 0 }}
             onClick={() => setActiveChip(c)}>{c}</Pill>
         ))}
       </div>
 
-      {/* Weekend Flash Deals */}
-      {weekendDeals.length > 0 && (
+      {/* Weekend Flash Deals — only shown when not searching */}
+      {weekendDeals.length > 0 && !searchQuery && activeChip === "All" && (
         <>
           <SectionTitle action="See all →">Weekend Flash Deals</SectionTitle>
           <div style={{ display: "flex", gap: 12, overflowX: "auto", marginBottom: 18, marginLeft: -2, paddingBottom: 4 }}>
@@ -141,7 +221,7 @@ export default function BuyerHome() {
                   ? <img src={p.items.image_urls[0]} alt="" style={{ width: "100%", height: 100, objectFit: "cover", display: "block" }} />
                   : <ImgSlot label="" tone="meat" h={100} r={0} />
                 }
-                <div style={{ padding: "10px 10px 10px" }}>
+                <div style={{ padding: "10px" }}>
                   <Pill tone="terra" size="xs" style={{ marginBottom: 6 }}>FLASH DEAL</Pill>
                   <div style={{ fontFamily: WS.serif, fontSize: 13, fontWeight: 600, lineHeight: 1.2, marginBottom: 4 }}>{p.items?.name}</div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -157,35 +237,32 @@ export default function BuyerHome() {
         </>
       )}
 
-      {/* Open pools */}
+      {/* Open pools — 3 per row compact grid */}
       <SectionTitle action="See all →">Open pools near you</SectionTitle>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 18 }}>
-        {loading
-          ? Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i} p={14} style={{ opacity: 0.4 }}>
-                <div style={{ background: WS.line, height: 120, borderRadius: 12, marginBottom: 12 }} />
-                <div style={{ background: WS.line, height: 14, borderRadius: 4, width: "70%", marginBottom: 8 }} />
-                <div style={{ background: WS.line2, height: 10, borderRadius: 4, width: "40%" }} />
-              </Card>
-            ))
-          : filtered.slice(0, 6).map(p => (
-              <PoolCard
-                key={p.id}
-                poolId={p.id}
-                item={p.items?.name ?? ""}
-                shop={p.shops?.name ?? ""}
-                priceGBP={(p.price_per_portion_gbp / 100).toFixed(2)}
-                members={[]}
-                filledPortions={p.filled_portions}
-                totalPortions={p.total_portions}
-                expiresAt={p.expires_at}
-                imageUrl={p.items?.image_urls?.[0]}
-                portion={`1/${p.total_portions}`}
-                savePercent={savePercent(p)}
-              />
-            ))
-        }
-      </div>
+
+      {loading ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ borderRadius: 14, overflow: "hidden", background: "#fff", border: `1px solid ${WS.line}`, opacity: 0.4 }}>
+              <div style={{ height: 90, background: WS.line }} />
+              <div style={{ padding: "8px 8px 10px" }}>
+                <div style={{ height: 10, background: WS.line2, borderRadius: 4, marginBottom: 6 }} />
+                <div style={{ height: 8, background: WS.line2, borderRadius: 4, width: "60%" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "32px 16px 24px", color: WS.ink2, fontSize: 13 }}>
+          {searchQuery
+            ? `No pools matching "${searchQuery}"`
+            : `No ${activeChip.toLowerCase()} pools open right now`}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
+          {filtered.slice(0, 9).map(p => <CompactPoolCard key={p.id} pool={p} />)}
+        </div>
+      )}
 
       {/* Shops section */}
       <SectionTitle action="Browse →">NE England shops</SectionTitle>
