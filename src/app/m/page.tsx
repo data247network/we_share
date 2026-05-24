@@ -93,6 +93,7 @@ export default function BuyerHome() {
   const [activeChip, setActiveChip] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [userName, setUserName] = useState("there");
+  const [expandedShop, setExpandedShop] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -130,6 +131,17 @@ export default function BuyerHome() {
   );
 
   const weekendDeals = pools.filter(isWeekendDeal);
+
+  const shopGroups = Object.values(
+    pools.reduce((acc, p) => {
+      const shopName = p.shops?.name ?? "Unknown";
+      if (!acc[shopName]) {
+        acc[shopName] = { name: shopName, logoUrl: p.shops?.logo_url ?? null, pools: [] as Pool[] };
+      }
+      acc[shopName].pools.push(p);
+      return acc;
+    }, {} as Record<string, { name: string; logoUrl: string | null; pools: Pool[] }>)
+  );
 
   return (
     <MobileScreen footer={<TabBar active="home" />}>
@@ -264,35 +276,54 @@ export default function BuyerHome() {
         </div>
       )}
 
-      {/* Shops section */}
+      {/* Shops section — accordion */}
       <SectionTitle action="Browse →">NE England shops</SectionTitle>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
-        {[
-          { name: "Tesco Metro Newcastle", domain: "tesco.com", color: "#EE1C25", initials: "T", rating: 4.8, pools: 3 },
-          { name: "Aldi Gateshead", domain: "aldi.co.uk", color: "#003087", initials: "A", rating: 4.7, pools: 2 },
-          { name: "Hutchinson's International Foods", domain: "hutchinsons.co.uk", color: "#8B4513", initials: "H", rating: 4.9, pools: 2 },
-        ].map(s => (
-          <Card key={s.name} p={14} style={{ cursor: "pointer" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: s.color, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
-                <img src={`https://www.google.com/s2/favicons?domain=${s.domain}&sz=64`} alt={s.name}
-                  style={{ width: 30, height: 30, objectFit: "contain" }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                    const el = (e.target as HTMLElement).parentElement;
-                    if (el) el.innerHTML = `<span style="color:#fff;font-family:serif;font-size:20px;font-weight:700">${s.initials}</span>`;
-                  }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: WS.serif, fontWeight: 600, fontSize: 15 }}>{s.name}</div>
-                <div style={{ fontSize: 12, color: WS.ink2, display: "flex", gap: 6, alignItems: "center" }}>
-                  {Icons.star(WS.butter, 12)} {s.rating} · {s.pools} active pools
+        {(loading ? [] : shopGroups).map(s => {
+          const isOpen = expandedShop === s.name;
+          return (
+            <div key={s.name}>
+              <Card p={14} style={{ cursor: "pointer" }} onClick={() => setExpandedShop(isOpen ? null : s.name)}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: WS.terraLt, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+                    {s.logoUrl
+                      ? <img src={s.logoUrl} alt={s.name} style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      : <span style={{ fontFamily: WS.serif, fontSize: 20, fontWeight: 700, color: WS.terraDk }}>{s.name[0]}</span>
+                    }
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: WS.serif, fontWeight: 600, fontSize: 15 }}>{s.name}</div>
+                    <div style={{ fontSize: 12, color: WS.ink2, marginTop: 2 }}>
+                      {s.pools.length} active pool{s.pools.length !== 1 ? "s" : ""}
+                    </div>
+                  </div>
+                  <div style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}>
+                    {Icons.chev(WS.mute, 16)}
+                  </div>
                 </div>
+              </Card>
+              {isOpen && (
+                <div style={{ paddingTop: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 4 }}>
+                    {s.pools.map(p => <CompactPoolCard key={p.id} pool={p} />)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {loading && (
+          <Card p={14} style={{ opacity: 0.4 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: WS.line }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ height: 12, background: WS.line, borderRadius: 4, marginBottom: 6, width: "60%" }} />
+                <div style={{ height: 10, background: WS.line2, borderRadius: 4, width: "40%" }} />
               </div>
-              {Icons.chev(WS.mute, 16)}
             </div>
           </Card>
-        ))}
+        )}
       </div>
 
       <div style={{ height: 24 }} />

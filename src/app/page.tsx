@@ -276,7 +276,7 @@ export default function BuyerWebHome() {
       </div>
 
       {/* All pools grid */}
-      <div style={{ padding: "20px 36px 40px" }}>
+      <div id="pools" style={{ padding: "20px 36px 40px" }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontFamily: WS.serif, fontSize: 24, fontWeight: 600, letterSpacing: "-0.015em" }}>
             {loading ? "Loading pools…" : `${filtered.length} pools open near you`}
@@ -348,7 +348,7 @@ export default function BuyerWebHome() {
       </div>
 
       {/* How it works */}
-      <div style={{ background: "#fff", padding: "40px 36px", borderTop: `1px solid ${WS.line}`, borderBottom: `1px solid ${WS.line}` }}>
+      <div id="how-it-works" style={{ background: "#fff", padding: "40px 36px", borderTop: `1px solid ${WS.line}`, borderBottom: `1px solid ${WS.line}` }}>
         <div style={{ fontFamily: WS.serif, fontSize: 24, fontWeight: 600, letterSpacing: "-0.015em", marginBottom: 24 }}>How WeShare works</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 24 }}>
           {howItWorks.map((s) => (
