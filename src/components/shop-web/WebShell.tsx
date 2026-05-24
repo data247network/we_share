@@ -76,7 +76,7 @@ export function WebShell({ active = "overview", children, breadcrumbs = ["Dashbo
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: `1px solid ${WS.line}`, borderRadius: 10, padding: "6px 12px", width: 280 }}>
             {Icons.search(WS.mute, 14)} <span style={{ fontSize: 12.5, color: WS.mute }}>Search items, pools, buyers…</span>
           </div>
-          <Btn tone="primary" size="sm">+ List item</Btn>
+          <Btn tone="primary" size="sm" onClick={() => window.location.href = "/shop/m/list"}>+ List item</Btn>
         </div>
         <div style={{ flex: 1, overflowY: "auto" }}>{children}</div>
       </div>

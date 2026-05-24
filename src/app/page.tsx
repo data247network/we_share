@@ -109,7 +109,7 @@ export default function BuyerWebHome() {
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
             <Btn tone="primary" size="lg" onClick={() => window.location.href = "/auth/signup"}>Browse open pools</Btn>
-            <Btn tone="ghost" size="lg">How it works →</Btn>
+            <Btn tone="ghost" size="lg" onClick={() => { const el = document.getElementById("how-it-works"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); else window.location.href = "/#how-it-works"; }}>How it works →</Btn>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 22, fontSize: 12, color: WS.ink2 }}>
             <AvatarStack names={["Sam T", "Jade H", "Ravi K", "Mo A", "Chloe D"]} more={1240} size={22} />

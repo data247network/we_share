@@ -71,7 +71,9 @@ export default function LoginPage() {
     <div style={{ minHeight: "100dvh", background: WS.cream, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 420 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <Logo size={28} />
+          <span style={{ cursor: "pointer" }} onClick={() => window.location.href = "/"}>
+            <Logo size={28} />
+          </span>
           <div style={{ fontFamily: WS.serif, fontSize: 28, fontWeight: 600, letterSpacing: "-0.02em", marginTop: 16 }}>Welcome back</div>
           <div style={{ fontSize: 14, color: WS.ink2, marginTop: 6 }}>Sign in to your WeShare account</div>
         </div>
