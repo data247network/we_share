@@ -191,15 +191,20 @@ export default function BuyerHome() {
       <SectionTitle action="Browse →">NE England shops</SectionTitle>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
         {[
-          { name: "Tesco Metro Newcastle", logo: "https://logo.clearbit.com/tesco.com", rating: 4.8, pools: 3 },
-          { name: "Aldi Gateshead", logo: "https://logo.clearbit.com/aldi.co.uk", rating: 4.7, pools: 2 },
-          { name: "Hutchinson's International Foods", logo: "https://logo.clearbit.com/hutchinsons.co.uk", rating: 4.9, pools: 2 },
+          { name: "Tesco Metro Newcastle", domain: "tesco.com", color: "#EE1C25", initials: "T", rating: 4.8, pools: 3 },
+          { name: "Aldi Gateshead", domain: "aldi.co.uk", color: "#003087", initials: "A", rating: 4.7, pools: 2 },
+          { name: "Hutchinson's International Foods", domain: "hutchinsons.co.uk", color: "#8B4513", initials: "H", rating: 4.9, pools: 2 },
         ].map(s => (
           <Card key={s.name} p={14} style={{ cursor: "pointer" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: WS.cream, border: `1px solid ${WS.line}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
-                <img src={s.logo} alt={s.name} style={{ height: 28, width: 44, objectFit: "contain" }}
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: s.color, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+                <img src={`https://www.google.com/s2/favicons?domain=${s.domain}&sz=64`} alt={s.name}
+                  style={{ width: 30, height: 30, objectFit: "contain" }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                    const el = (e.target as HTMLElement).parentElement;
+                    if (el) el.innerHTML = `<span style="color:#fff;font-family:serif;font-size:20px;font-weight:700">${s.initials}</span>`;
+                  }} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: WS.serif, fontWeight: 600, fontSize: 15 }}>{s.name}</div>

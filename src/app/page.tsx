@@ -22,12 +22,14 @@ const howItWorks = [
 ];
 
 const shopLogos = [
-  { name: "Tesco", logo: "https://logo.clearbit.com/tesco.com", slug: "tesco-metro-newcastle" },
-  { name: "Aldi", logo: "https://logo.clearbit.com/aldi.co.uk", slug: "aldi-gateshead" },
-  { name: "Lidl", logo: "https://logo.clearbit.com/lidl.co.uk", slug: "lidl-sunderland" },
-  { name: "Morrisons", logo: "https://logo.clearbit.com/morrisons.com", slug: "morrisons-newcastle" },
-  { name: "Asda", logo: "https://logo.clearbit.com/asda.com", slug: "asda-byker" },
-  { name: "Hutchinson's", logo: "https://logo.clearbit.com/hutchinsons.co.uk", slug: "hutchinsons-international" },
+  { name: "Tesco", domain: "tesco.com", color: "#EE1C25", initials: "T" },
+  { name: "Aldi", domain: "aldi.co.uk", color: "#003087", initials: "A" },
+  { name: "Lidl", domain: "lidl.co.uk", color: "#0050AA", initials: "L" },
+  { name: "Morrisons", domain: "morrisons.com", color: "#00A956", initials: "M" },
+  { name: "Asda", domain: "asda.com", color: "#78BE20", initials: "A" },
+  { name: "Hutchinson's", domain: "hutchinsons.co.uk", color: "#8B4513", initials: "H" },
+  { name: "Iceland", domain: "iceland.co.uk", color: "#CC0000", initials: "I" },
+  { name: "Co-op", domain: "coop.co.uk", color: "#00B1E7", initials: "C" },
 ];
 
 interface Pool {
@@ -155,24 +157,40 @@ export default function BuyerWebHome() {
         </div>
       </div>
 
-      {/* Shop logos strip */}
-      <div style={{ background: "#fff", borderTop: `1px solid ${WS.line}`, borderBottom: `1px solid ${WS.line}`, padding: "16px 36px" }}>
-        <div style={{ fontSize: 11, fontFamily: WS.mono, color: WS.mute, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 14 }}>
+      {/* Shop logos carousel */}
+      <style>{`
+        @keyframes logoScroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .logo-track { animation: logoScroll 22s linear infinite; }
+        .logo-track:hover { animation-play-state: paused; }
+      `}</style>
+      <div style={{ background: "#fff", borderTop: `1px solid ${WS.line}`, borderBottom: `1px solid ${WS.line}`, padding: "16px 0" }}>
+        <div style={{ fontSize: 11, fontFamily: WS.mono, color: WS.mute, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 14, paddingLeft: 36 }}>
           Wholesale from your local shops
         </div>
-        <div style={{ display: "flex", gap: 28, alignItems: "center", overflowX: "auto" }}>
-          {shopLogos.map((s) => (
-            <div key={s.slug} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer", opacity: 0.85 }}
-              onClick={() => window.location.href = `/auth/signup`}>
-              <img
-                src={s.logo}
-                alt={s.name}
-                style={{ height: 32, width: 80, objectFit: "contain", filter: "grayscale(20%)" }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
-              <span style={{ fontSize: 10, color: WS.ink2, fontFamily: WS.mono }}>{s.name}</span>
-            </div>
-          ))}
+        <div style={{ overflow: "hidden", position: "relative" }}>
+          <div className="logo-track" style={{ display: "flex", gap: 0, width: "max-content" }}>
+            {[...shopLogos, ...shopLogos].map((s, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: "pointer", padding: "0 28px", flexShrink: 0 }}
+                onClick={() => window.location.href = "/auth/signup"}>
+                <div style={{ width: 64, height: 64, borderRadius: 16, background: s.color, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,0.10)", position: "relative", overflow: "hidden" }}>
+                  <img
+                    src={`https://www.google.com/s2/favicons?domain=${s.domain}&sz=64`}
+                    alt={s.name}
+                    style={{ width: 40, height: 40, objectFit: "contain" }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                      const el = (e.target as HTMLElement).parentElement;
+                      if (el) el.innerHTML = `<span style="color:#fff;font-family:serif;font-size:24px;font-weight:700">${s.initials}</span>`;
+                    }}
+                  />
+                </div>
+                <span style={{ fontSize: 11, color: WS.ink2, fontFamily: WS.mono, fontWeight: 600, whiteSpace: "nowrap" }}>{s.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

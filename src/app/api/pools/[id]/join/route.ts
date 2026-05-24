@@ -69,12 +69,12 @@ export async function POST(
 
   const buyerEmail = profile?.email ?? user.email ?? "";
 
-  // Calculate pricing (amounts in pence)
-  const pricePencePerPortion = Math.round(pool.price_per_portion_gbp * 100);
+  // Calculate pricing (price_per_portion_gbp is already in pence per schema)
+  const pricePencePerPortion = pool.price_per_portion_gbp;
   const subtotalPence = pricePencePerPortion * portions;
   const servicePence = calcServiceFee(subtotalPence);
   const deliveryPence = calcDeliveryShare(pool.total_portions, portions, pool.total_portions);
-  const totalPence = subtotalPence + servicePence + deliveryPence;
+  const totalPence = Math.round(subtotalPence + servicePence + deliveryPence);
 
   // Get or create Stripe customer
   const customerId = await getOrCreateCustomer(buyerEmail, profile?.full_name ?? undefined);
@@ -97,7 +97,7 @@ export async function POST(
       pool_id: id,
       buyer_id: user.id,
       portions,
-      price_paid_gbp: totalPence / 100,
+      price_paid_gbp: totalPence,
       delivery_address,
       delivery_lat: delivery_lat ?? null,
       delivery_lng: delivery_lng ?? null,
