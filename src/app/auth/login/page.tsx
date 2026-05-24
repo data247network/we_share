@@ -23,14 +23,20 @@ export default function LoginPage() {
     if (error) {
       setError(error.message);
     } else if (data.user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
-      const role = profile?.role ?? "buyer";
-      const redirect = role === "shop" ? "/shop/dashboard" : role === "rider" ? "/rider/route" : role === "admin" ? "/admin" : "/m";
-      window.location.href = redirect;
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo = params.get("redirect");
+      if (redirectTo) {
+        window.location.href = redirectTo;
+      } else {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+        const role = profile?.role ?? "buyer";
+        const dest = role === "shop" ? "/shop/dashboard" : role === "rider" ? "/rider/route" : role === "admin" ? "/admin" : "/m";
+        window.location.href = dest;
+      }
     }
     setLoading(false);
   }
